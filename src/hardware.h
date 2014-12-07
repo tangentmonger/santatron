@@ -7,6 +7,9 @@
 #define SW24 A3 
 
 #define GO_BUTTON 2 //ie red pins
+#define RED_LED 3 //yellow?
+#define GREEN_LED 5 //yellow?
+
 
 //LEDs for under the valves
 //#define LED0_PWM 3

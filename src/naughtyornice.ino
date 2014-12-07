@@ -2,17 +2,12 @@
 
 // runs on arduino uno with Robs pcbs
 
-/*
-on read, pulse red for 5 goes, then settle on colour, stay on roughly until it stops (~20 seconds)
-
-put on github
-*/
-
 #include "hardware.h" //definitions for Rob's PCB
 #include "data.h" // output text
 
-int nextText = -1;
+int currentSelection = -1;
 int buttonStatus; //using button as if momentary :S
+int FLASH_NUM = 5; //how often to flash red LED while "reading"
 int PRINT_TIME = 21; //seconds
 
 // sets up inputs, outputs etc
@@ -20,18 +15,21 @@ void setup() {
 
     pinMode(GO_BUTTON, INPUT);
 	pinMode(LED13, OUTPUT);
+	pinMode(RED_LED, OUTPUT);
+	pinMode(GREEN_LED, OUTPUT);
     buttonStatus = digitalRead(GO_BUTTON);
 }
 
 // runs continuously, once the setup has run
 void loop() {
 	waitForGoButton();
+    selectTextNumber();
 	flashLights();
 	char* text = generateText();
-	printText(text);
+	char* elfQuotient = formatELFQuotient();
+	printText(text, elfQuotient);
+    glowResultLight();
     buttonStatus = digitalRead(GO_BUTTON);
-    delay(3000); //in case they were holding button down
-    
 } 
 
 // wait for someone to press GO
@@ -41,44 +39,57 @@ void waitForGoButton(){
 	}
 }
 
+// select which text to print next, by number
+// first selection is "random", then proceed through the list and wrap around
+void selectTextNumber(){
+    if (currentSelection == -1){
+        currentSelection = millis() % numTexts;
+    } else {
+        currentSelection = (currentSelection + 1) % numTexts;
+    }
+}
+
+//Flash red LED FLASH_NUM times.
 void flashLights(){
-    //TODO
+    for(int i=0;i<FLASH_NUM;i++){
+        digitalWrite(RED_LED, HIGH);
+        delay(250);
+        digitalWrite(RED_LED, LOW);
+        delay(250);
+    }
+}
+
+//Retrieve ELF quotient and format it as text
+char* formatELFQuotient(){
+	char text[50];
+    strcpy_P(text, "ELF quotient: ");
+    char quotient[3];
+    itoa(elfs[currentSelection], quotient, 10);
+    strcat(text, quotient);
+    strcat(text, "%");
+	return text;
 }
 	
-
-
-
-// Generate text from "random" numbers
-
+// Retrieve selected text
 char* generateText(){
 	char text[300];
-	char present[300];
-
-    if (nextText == -1){
-        nextText = millis() % numTexts;
-    } else {
-        nextText = (nextText + 1) % numTexts;
-    }
-
-	//fetch the next text
-	int nextText = millis() % numTexts;
-    strcpy_P(text, (char*)pgm_read_word(&(texts[nextText])));
-
+    strcpy_P(text, (char*)pgm_read_word(&(texts[currentSelection])));
 	return text;
-
 }
 
 
 
 // Word wrap the text and send to the printer
-void printText(char* text){
+void printText(char* text, char* elfQuotient){
 	Serial.begin(2400); 
 	Serial.println("****************************************");
 	Serial.println("*                                      *");
 	Serial.println("*       SANTOMATIC: 2014 REPORT        *");
 	Serial.println("*                                      *");
 	Serial.println("****************************************");
-
+	Serial.println();
+	Serial.println(elfQuotient);
+	Serial.println();
 
 
 	//Break up the text to fit into the printer's line width.
@@ -139,6 +150,20 @@ void printText(char* text){
 	Serial.end();
 }
 
+//Glow red or green (depending on ELF quotient) for roughly as
+//long as it takes to print
+void glowResultLight(){
+    int colour;
+    if (elfs[currentSelection] > 50){
+        colour = GREEN_LED;
+    } else {
+        colour = RED_LED;
+    }
+    
+    digitalWrite(colour, HIGH);
+    delay(PRINT_TIME * 1000);
+    digitalWrite(colour, LOW);
+}
 
 
 // each time this is called, change the LED light level (ie call frequently for a nice smooth pulse)
